@@ -18,6 +18,7 @@ import com.diegojacober.app_auth_keycloak.dtos.RoleDTO;
 import feign.Headers;
 
 @FeignClient(name = "auth-service", url = "http://localhost:8181")
+// @FeignClient(name = "auth-service", url = "http://host.docker.internal:8181")
 public interface AuthServiceClient {
    @PostMapping(value = "/realms/test/protocol/openid-connect/token")
    @Headers("Content-Type: application/x-www-form-urlencoded")

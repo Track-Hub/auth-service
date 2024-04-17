@@ -8,3 +8,5 @@ localhost:8083/auth/userinfo
 localhost:8083/auth/users/{userId}/roles
 localhost:8083/auth/users?q=
 localhost:8083/auth/users/{role}
+
+docker run diegojacober:trackhub-service -p 8082:8082
