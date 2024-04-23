@@ -1,5 +1,9 @@
 ./mvnw clean package
 
+docker build -t “diegojacober:trackhub-service” -f ./Dockerfile 
+docker tag trackhub-service  diegojacober/trackhub-service:1.0
+docker push diegojacober/trackhub-service:1.0
+
 
 localhost:8083/auth/login
 localhost:8083/auth/refresh

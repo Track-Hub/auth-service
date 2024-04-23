@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.diegojacober.app_auth_keycloak.dtos.CreateUserDTO;
 import com.diegojacober.app_auth_keycloak.dtos.LoginDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RefreshDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RequestNewRoleDTO;
@@ -200,6 +201,26 @@ public class AuthController {
             return authServiceClient.getUsersByRole(role, headers);
         } catch (FeignException.Unauthorized ex) {
             throw new IncorrectCredentialsException("Credenciais incorretas.");
+        }
+    }
+
+    @PostMapping("/users")
+    @PreAuthorize("hasRole('instructor')")
+    public Object createUser(@RequestBody @Valid CreateUserDTO userDTO)
+            throws IncorrectBodyException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Jwt user = (Jwt) authentication.getPrincipal();
+        String token = user.getTokenValue();
+        HttpHeaders headers = new HttpHeaders();
+
+        try {
+
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+
+            return authServiceClient.createUser(userDTO, headers);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
         }
     }
 
