@@ -102,11 +102,13 @@ public class AuthController {
         final String oboToken = userDto.getToken();
 
          
-        final OnBehalfOfCredential credential = new OnBehalfOfCredentialBuilder()
-        .clientId("5daa006a-c35a-40d4-935b-81e49cbc1f2e")
-        .tenantId("0ae51e19-07c8-4e4b-bb6d-648ee58410f4")
-        .clientSecret("HpL8Q~ZqH5MGzUDk6_5vF2waQfOJtNl.bjqopc5r")
-            .userAssertion(oboToken).build();
+        // final OnBehalfOfCredential credential = new OnBehalfOfCredentialBuilder()
+        // .clientId("5daa006a-c35a-40d4-935b-81e49cbc1f2e")
+        // .tenantId("0ae51e19-07c8-4e4b-bb6d-648ee58410f4")
+        // .clientSecret("HpL8Q~ZqH5MGzUDk6_5vF2waQfOJtNl.bjqopc5r")
+        //     .userAssertion(oboToken).build();
+
+        final AzureIdentityAuthenticationProvider authenticationProvider =  new AzureIdentityAuthenticationProvider(credential, null, scopes);
          
         if (null == scopes || null == credential) {
             throw new Exception("Unexpected error");
