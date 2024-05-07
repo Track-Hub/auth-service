@@ -8,3 +8,22 @@ spring:
 
 server:
   port: 8083
+
+
+auth-service:
+  cors:
+    enable: true
+    allowedOrigins:
+      - "*"
+    allowedHeaders:
+      - "Content-Type"
+  azure:
+    tenantId: "0ae51e19-07c8-4e4b-bb6d-648ee58410f4"
+    clientId: "5daa006a-c35a-40d4-935b-81e49cbc1f2e"
+    graph:
+      proxy:
+        enable: true
+        host: ${PROXY_URL}
+        port: ${PROXY_PORT}
+        username: ${USER}
+        password: ${USER_PASSWORD}

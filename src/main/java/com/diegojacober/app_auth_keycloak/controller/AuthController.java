@@ -1,11 +1,14 @@
 package com.diegojacober.app_auth_keycloak.controller;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,18 +24,30 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.azure.core.http.HttpClient;
+import com.azure.identity.OnBehalfOfCredential;
+import com.azure.identity.OnBehalfOfCredentialBuilder;
+import com.diegojacober.app_auth_keycloak.config.AuthServiceConfigurationProperties;
 import com.diegojacober.app_auth_keycloak.dtos.CreateUserDTO;
 import com.diegojacober.app_auth_keycloak.dtos.LoginDTO;
+import com.diegojacober.app_auth_keycloak.dtos.LoginDTOSSO;
 import com.diegojacober.app_auth_keycloak.dtos.RefreshDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RequestNewRoleDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RoleDTO;
 import com.diegojacober.app_auth_keycloak.dtos.enums.Role;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectBodyException;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectCredentialsException;
+import com.diegojacober.app_auth_keycloak.infra.MSGraph.JwtGraphAuthenticationProvider;
 import com.diegojacober.app_auth_keycloak.infra.OpenFeign.AuthServiceClient;
+import com.microsoft.graph.authentication.IAuthenticationProvider;
+import com.microsoft.graph.authentication.TokenCredentialAuthProvider;
+import com.microsoft.graph.models.User;
+import com.microsoft.graph.serviceclient.GraphServiceClient;
+import com.microsoft.graph.httpcore.HttpClients;
 
 import feign.FeignException;
 import jakarta.validation.Valid;
+import okhttp3.OkHttpClient;
 
 @RequestMapping("/auth")
 @RestController
@@ -40,6 +55,9 @@ public class AuthController {
 
     @Autowired
     private AuthServiceClient authServiceClient;
+
+    @Autowired
+    private AuthServiceConfigurationProperties configurations;
 
     @PostMapping("/login")
     public ResponseEntity<String> accessToken(@RequestBody @Valid LoginDTO user) throws IncorrectCredentialsException {
@@ -57,6 +75,71 @@ public class AuthController {
         } catch (FeignException.Unauthorized ex) {
             throw new IncorrectCredentialsException("Credenciais incorretas.");
         }
+    }
+
+    @PostMapping("/login/sso")
+    public String loginBoschUser(@RequestBody @Valid LoginDTOSSO userDto) {
+        // tenho sso, vou acessar
+        // se eu ja tenho usuario no keycloak, so faz login
+
+        final IAuthenticationProvider jwtAuthenticationProvider = new JwtGraphAuthenticationProvider(
+                userDto.getToken());
+
+        // OkHttpClient.Builder builder =
+        // HttpClients.createDefault(jwtAuthenticationProvider).newBuilder();
+        OkHttpClient.Builder builder = HttpClients.createDefault(jwtAuthenticationProvider).newBuilder();
+
+        if (configurations.getAzure().getGraph().getProxy().isEnable()) {
+            builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(
+                    configurations.getAzure().getGraph().getProxy().getHost(),
+                    Integer.parseInt(
+                            configurations.getAzure().getGraph().getProxy().getPort()))));
+        }
+
+        final String[] scopes = new String[] {"https://graph.microsoft.com/.default"};
+         
+        // This is the incoming token to exchange using on-behalf-of flow
+        final String oboToken = userDto.getToken();
+
+         
+        final OnBehalfOfCredential credential = new OnBehalfOfCredentialBuilder()
+        .clientId("5daa006a-c35a-40d4-935b-81e49cbc1f2e")
+        .tenantId("0ae51e19-07c8-4e4b-bb6d-648ee58410f4")
+        .clientSecret("HpL8Q~ZqH5MGzUDk6_5vF2waQfOJtNl.bjqopc5r")
+            .userAssertion(oboToken).build();
+         
+        if (null == scopes || null == credential) {
+            throw new Exception("Unexpected error");
+        }
+         
+        final GraphServiceClient graphClient = new GraphServiceClient(credential, scopes);
+
+
+
+
+
+
+
+
+
+
+        // GraphServiceClient.getGraphClientOptions()
+        // .authenticationProvider(jwtAuthenticationProvider)
+        // .httpClient(builder.build())
+        // .buildClient();
+
+        // final User user = graphServiceClient.me()
+        // .buildRequest().get();
+
+        // se eu nao tenho no keycloak, chama graph, pega os dados e salva no keycloak
+        // pra verificar se não existe no keycloak, usar a rota /users?q=email:
+
+        // - login sso
+        // - recuperar o jwt do sso
+        // - gera um novo token da propria api, usando os dados do token do microsoft
+
+        // return user.getCity();
+        return null;
     }
 
     @PostMapping("/refresh")
