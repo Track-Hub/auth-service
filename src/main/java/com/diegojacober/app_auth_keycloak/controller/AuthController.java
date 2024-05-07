@@ -101,11 +101,6 @@ public class AuthController {
         // This is the incoming token to exchange using on-behalf-of flow
         final String oboToken = userDto.getToken();
 
-         
-        // final OnBehalfOfCredential credential = new OnBehalfOfCredentialBuilder()
-        // .clientId("5daa006a-c35a-40d4-935b-81e49cbc1f2e")
-        // .tenantId("0ae51e19-07c8-4e4b-bb6d-648ee58410f4")
-        //     .userAssertion(oboToken).build();
 
         final AzureIdentityAuthenticationProvider authenticationProvider =  new AzureIdentityAuthenticationProvider(credential, null, scopes);
          
