@@ -1,14 +1,13 @@
 package com.diegojacober.app_auth_keycloak.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-@Configuration
 @ConfigurationProperties("auth-service")
 public class AuthServiceConfigurationProperties {
     private CorsProperties cors = new CorsProperties();

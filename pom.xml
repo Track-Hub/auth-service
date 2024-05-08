@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>3.2.0</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.diegojacober</groupId>
 	<artifactId>app_auth_keycloak</artifactId>
@@ -67,24 +68,10 @@
 			<version>4.1.0</version>
 		</dependency>
 		<dependency>
-			<!-- Include the sdk as a dependency -->
-			<groupId>com.microsoft.graph</groupId>
-			<artifactId>microsoft-graph</artifactId>
-			<!--x-release-please-start-version-->
-			<version>6.8.0</version>
-			<!--x-release-please-end-->
-			</dependency>
-			<dependency>
-			<!-- This dependency is only needed if you are using a TokenCredential object for authentication -->
-			<groupId>com.azure</groupId>
-			<artifactId>azure-identity</artifactId>
-			<version>1.11.0</version>
-			</dependency>
-			<dependency>
-				<groupId>com.microsoft.graph</groupId>
-				<artifactId>microsoft-graph-core</artifactId>
-				<version>2.0.15</version>
-			</dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.10.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

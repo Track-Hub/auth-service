@@ -2,13 +2,13 @@ package com.diegojacober.app_auth_keycloak.controller;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,9 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.azure.core.http.HttpClient;
-import com.azure.identity.OnBehalfOfCredential;
-import com.azure.identity.OnBehalfOfCredentialBuilder;
 import com.diegojacober.app_auth_keycloak.config.AuthServiceConfigurationProperties;
 import com.diegojacober.app_auth_keycloak.dtos.CreateUserDTO;
 import com.diegojacober.app_auth_keycloak.dtos.LoginDTO;
@@ -37,17 +34,13 @@ import com.diegojacober.app_auth_keycloak.dtos.RoleDTO;
 import com.diegojacober.app_auth_keycloak.dtos.enums.Role;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectBodyException;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectCredentialsException;
-import com.diegojacober.app_auth_keycloak.infra.MSGraph.JwtGraphAuthenticationProvider;
 import com.diegojacober.app_auth_keycloak.infra.OpenFeign.AuthServiceClient;
-import com.microsoft.graph.authentication.IAuthenticationProvider;
-import com.microsoft.graph.authentication.TokenCredentialAuthProvider;
-import com.microsoft.graph.models.User;
-import com.microsoft.graph.serviceclient.GraphServiceClient;
-import com.microsoft.graph.httpcore.HttpClients;
+import com.diegojacober.app_auth_keycloak.domain.entities.Credentials;
+import com.diegojacober.app_auth_keycloak.domain.entities.User;
+import com.google.gson.Gson;
 
 import feign.FeignException;
 import jakarta.validation.Valid;
-import okhttp3.OkHttpClient;
 
 @RequestMapping("/auth")
 @RestController
@@ -58,6 +51,68 @@ public class AuthController {
 
     @Autowired
     private AuthServiceConfigurationProperties configurations;
+
+    private ResponseEntity<String> loginKeycloak(String username, String password)
+            throws IncorrectCredentialsException {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("client_id", "trackhub");
+        formData.add("username", username);
+        formData.add("password", password);
+        formData.add("grant_type", "password");
+        formData.add("client_secret", "gJSYrFwjBbc9mPA7uYbh1SDaf7TVXWIl");
+        formData.add("scope", "openid profile email");
+
+        try {
+            var login = authServiceClient.getToken(formData);
+            return login;
+        } catch (FeignException.Unauthorized ex) {
+            throw new IncorrectCredentialsException("Credenciais incorretas.");
+        }
+    }
+
+    private ResponseEntity<String> createUserKeycloak(CreateUserDTO userDTO, String token)
+            throws IncorrectBodyException {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+
+            return authServiceClient.createUser(userDTO, headers);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
+        }
+    }
+
+    private ResponseEntity<String> setRoleUser(Role role, String token, String userId) throws IncorrectBodyException {
+        HttpHeaders headers = new HttpHeaders();
+
+        String idRole = "";
+        if (role.equals(Role.APPRENTICE)) {
+            // idRole = "257afb7f-7930-4dd3-a768-ffef905767db";
+            idRole = "79234a79-b534-44fa-991c-575b9900998b";
+        } else if (role.equals(Role.INSTRUCTOR)) {
+            // idRole = "47aaded2-ad99-43e5-b222-60be9449586d";
+            idRole = "5c17ade7-0bfd-4604-9a0a-7637a23e45f2";
+        }
+
+        RoleDTO roleDTO = RoleDTO.builder()
+                .composite(false)
+                .clientRole(true)
+                .name(role.toString())
+                .id(idRole)
+                .containerId("d0bdc3b3-30be-4881-b7d9-9744cb26ed47")
+                .build();
+        try {
+
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+            List<RoleDTO> roles = Arrays.asList(roleDTO);
+            return authServiceClient.postUserRoles(userId, headers, roles);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
+        }
+    }
 
     @PostMapping("/login")
     public ResponseEntity<String> accessToken(@RequestBody @Valid LoginDTO user) throws IncorrectCredentialsException {
@@ -78,64 +133,57 @@ public class AuthController {
     }
 
     @PostMapping("/login/sso")
-    public String loginBoschUser(@RequestBody @Valid LoginDTOSSO userDto) {
-        // tenho sso, vou acessar
-        // se eu ja tenho usuario no keycloak, so faz login
+    public ResponseEntity<String> loginBoschUser(@RequestBody LoginDTOSSO userDto) throws Exception {
+        try {
+            var tokenAdmin = loginKeycloak("instrutor", "123456").getBody().split(":")[1].split(",")[0].replaceAll("\"",
+                    "");
 
-        final IAuthenticationProvider jwtAuthenticationProvider = new JwtGraphAuthenticationProvider(
-                userDto.getToken());
+            HttpHeaders headersAdmin = new HttpHeaders();
+            headersAdmin.add(HttpHeaders.AUTHORIZATION, ("Bearer " + tokenAdmin));
 
-        // OkHttpClient.Builder builder =
-        // HttpClients.createDefault(jwtAuthenticationProvider).newBuilder();
-        OkHttpClient.Builder builder = HttpClients.createDefault(jwtAuthenticationProvider).newBuilder();
+            String q = "email:" + userDto.getEmail();
 
-        if (configurations.getAzure().getGraph().getProxy().isEnable()) {
-            builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(
-                    configurations.getAzure().getGraph().getProxy().getHost(),
-                    Integer.parseInt(
-                            configurations.getAzure().getGraph().getProxy().getPort()))));
+            var users = authServiceClient.getUsers(headersAdmin, q);
+            Gson gson = new Gson();
+            User[] usersArray = gson.fromJson(users.getBody(), User[].class);
+
+            if (usersArray.length > 0) {
+                // pega o primeiro usuário com esse username, coloca a senha padrão e retorna
+                // ele
+                var loginUser = loginKeycloak(usersArray[0].getUsername(), "123456");
+                return loginUser;
+            } else {
+                List<Credentials> credentials = new ArrayList<>();
+                credentials.add(new Credentials(false, "password", "123456"));
+
+                var newUser = CreateUserDTO
+                        .builder()
+                        .credentials(credentials)
+                        .email(userDto.getEmail())
+                        .firstName(userDto.getFirstName())
+                        .lastName(userDto.getLastName())
+                        .username(userDto.getUsername())
+                        .emailVerified(true)
+                        .enabled(true)
+                        .build();
+
+                // cria o usuário
+                createUserKeycloak(newUser, tokenAdmin);
+
+                // faz uma busca para pegar o id dele
+                var userCreated = authServiceClient.getUsers(headersAdmin, q);
+                User[] userCreatedArray = gson.fromJson(userCreated.getBody(), User[].class);
+
+                // seta uma role
+                setRoleUser(userDto.getRole(), tokenAdmin, userCreatedArray[0].getId());
+
+                // faz login e retorna os dados
+                return loginKeycloak(newUser.getUsername(), "123456");
+            }
+
+        } catch (FeignException.Unauthorized ex) {
+            throw new IncorrectCredentialsException("Credenciais incorretas.");
         }
-
-        final String[] scopes = new String[] {"https://graph.microsoft.com/.default"};
-         
-        // This is the incoming token to exchange using on-behalf-of flow
-        final String oboToken = userDto.getToken();
-
-
-        final AzureIdentityAuthenticationProvider authenticationProvider =  new AzureIdentityAuthenticationProvider(credential, null, scopes);
-         
-        if (null == scopes || null == credential) {
-            throw new Exception("Unexpected error");
-        }
-         
-        final GraphServiceClient graphClient = new GraphServiceClient(credential, scopes);
-
-
-
-
-
-
-
-
-
-
-        // GraphServiceClient.getGraphClientOptions()
-        // .authenticationProvider(jwtAuthenticationProvider)
-        // .httpClient(builder.build())
-        // .buildClient();
-
-        // final User user = graphServiceClient.me()
-        // .buildRequest().get();
-
-        // se eu nao tenho no keycloak, chama graph, pega os dados e salva no keycloak
-        // pra verificar se não existe no keycloak, usar a rota /users?q=email:
-
-        // - login sso
-        // - recuperar o jwt do sso
-        // - gera um novo token da propria api, usando os dados do token do microsoft
-
-        // return user.getCity();
-        return null;
     }
 
     @PostMapping("/refresh")
@@ -158,7 +206,7 @@ public class AuthController {
     }
 
     @GetMapping("/userinfo")
-    public Object getUserInfo() throws IncorrectCredentialsException {
+    public ResponseEntity<String> getUserInfo() throws IncorrectCredentialsException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Jwt user = (Jwt) authentication.getPrincipal();
 
@@ -182,7 +230,7 @@ public class AuthController {
 
     @GetMapping("/users")
     @PreAuthorize("hasRole('instructor')")
-    public Object getUsers(@RequestHeader HttpHeaders headers, @RequestParam String q)
+    public ResponseEntity<String> getUsers(@RequestHeader HttpHeaders headers, @RequestParam String q)
             throws IncorrectCredentialsException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Jwt user = (Jwt) authentication.getPrincipal();
@@ -201,7 +249,7 @@ public class AuthController {
     @GetMapping("/users/{userId}/roles")
     @PreAuthorize("hasRole('instructor')")
 
-    public Object getUserRoles(@PathVariable String userId) throws IncorrectCredentialsException {
+    public ResponseEntity<String> getUserRoles(@PathVariable String userId) throws IncorrectCredentialsException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Jwt user = (Jwt) authentication.getPrincipal();
         String token = user.getTokenValue();
@@ -217,44 +265,18 @@ public class AuthController {
 
     @PostMapping("/users/{userId}/roles")
     @PreAuthorize("hasRole('instructor')")
-    public Object postUserRole(@PathVariable String userId, @RequestBody @Valid RequestNewRoleDTO dto)
+    public ResponseEntity<String> postUserRole(@PathVariable String userId, @RequestBody @Valid RequestNewRoleDTO dto)
             throws IncorrectBodyException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Jwt user = (Jwt) authentication.getPrincipal();
         String token = user.getTokenValue();
-        HttpHeaders headers = new HttpHeaders();
 
-        System.out.println(dto.getRole());
-        String idRole = "";
-        if (dto.getRole().equals(Role.APPRENTICE)) {
-            // idRole = "257afb7f-7930-4dd3-a768-ffef905767db";
-            idRole = "79234a79-b534-44fa-991c-575b9900998b";
-        } else if (dto.getRole().equals(Role.INSTRUCTOR)) {
-            // idRole = "47aaded2-ad99-43e5-b222-60be9449586d";
-            idRole = "5c17ade7-0bfd-4604-9a0a-7637a23e45f2";
-        }
-
-        RoleDTO roleDTO = RoleDTO.builder()
-                .composite(false)
-                .clientRole(true)
-                .name(dto.getRole().toString())
-                .id(idRole)
-                .containerId("d0bdc3b3-30be-4881-b7d9-9744cb26ed47")
-                .build();
-        try {
-
-            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
-            List<RoleDTO> roles = Arrays.asList(roleDTO);
-            return authServiceClient.postUserRoles(userId, headers, roles);
-        } catch (FeignException ex) {
-            System.out.println(ex.getMessage());
-            throw new IncorrectBodyException("campos inválidos");
-        }
+        return setRoleUser(dto.getRole(), token, userId);
     }
 
     @GetMapping("/roles")
     @PreAuthorize("hasRole('instructor')")
-    public Object getRoles() throws IncorrectCredentialsException {
+    public ResponseEntity<String> getRoles() throws IncorrectCredentialsException {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             Jwt user = (Jwt) authentication.getPrincipal();
@@ -270,7 +292,7 @@ public class AuthController {
 
     @GetMapping("/users/{role}")
     @PreAuthorize("hasRole('instructor')")
-    public Object getUsersByRole(@PathVariable String role) throws IncorrectCredentialsException {
+    public ResponseEntity<String> getUsersByRole(@PathVariable String role) throws IncorrectCredentialsException {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             Jwt user = (Jwt) authentication.getPrincipal();
@@ -285,22 +307,13 @@ public class AuthController {
 
     @PostMapping("/users")
     @PreAuthorize("hasRole('instructor')")
-    public Object createUser(@RequestBody @Valid CreateUserDTO userDTO)
+    public ResponseEntity<String> createUser(@RequestBody @Valid CreateUserDTO userDTO)
             throws IncorrectBodyException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Jwt user = (Jwt) authentication.getPrincipal();
         String token = user.getTokenValue();
-        HttpHeaders headers = new HttpHeaders();
 
-        try {
-
-            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
-
-            return authServiceClient.createUser(userDTO, headers);
-        } catch (FeignException ex) {
-            System.out.println(ex.getMessage());
-            throw new IncorrectBodyException("campos inválidos");
-        }
+        return createUserKeycloak(userDTO, token);
     }
 
 }

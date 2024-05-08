@@ -1,4 +1,4 @@
-package com.diegojacober.app_auth_keycloak.dtos;
+package com.diegojacober.app_auth_keycloak.domain.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
