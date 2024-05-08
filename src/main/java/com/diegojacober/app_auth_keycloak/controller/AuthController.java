@@ -133,7 +133,7 @@ public class AuthController {
     }
 
     @PostMapping("/login/sso")
-    public ResponseEntity<String> loginBoschUser(@RequestBody LoginDTOSSO userDto) throws Exception {
+    public ResponseEntity<String> loginBoschUser(@RequestBody @Valid LoginDTOSSO userDto) throws Exception {
         try {
             var tokenAdmin = loginKeycloak("instrutor", "123456").getBody().split(":")[1].split(",")[0].replaceAll("\"",
                     "");
