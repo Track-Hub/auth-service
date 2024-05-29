@@ -9,4 +9,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Attributes {
     private String group_id;
+    private String edv;
 }

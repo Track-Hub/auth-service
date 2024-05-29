@@ -15,9 +15,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +34,7 @@ import com.diegojacober.app_auth_keycloak.dtos.LoginDTOSSO;
 import com.diegojacober.app_auth_keycloak.dtos.RefreshDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RequestNewRoleDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RoleDTO;
+import com.diegojacober.app_auth_keycloak.dtos.UpdateUser;
 import com.diegojacober.app_auth_keycloak.dtos.enums.Role;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectBodyException;
 import com.diegojacober.app_auth_keycloak.exceptions.IncorrectCredentialsException;
@@ -44,6 +48,7 @@ import jakarta.validation.Valid;
 
 @RequestMapping("/auth")
 @RestController
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
@@ -84,6 +89,34 @@ public class AuthController {
         }
     }
 
+    private ResponseEntity<String> updateUserKeycloak(String userId, UpdateUser userDTO, String token)
+            throws IncorrectBodyException {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+
+            return authServiceClient.updateUser(userId, userDTO, headers);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
+        }
+    }
+
+    private ResponseEntity<String> updateMeKeycloak(UpdateUser userDTO, String token)
+            throws IncorrectBodyException {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+
+            return authServiceClient.updateUserProfile(userDTO, headers);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
+        }
+    }
+
     private ResponseEntity<String> setRoleUser(Role role, String token, String userId) throws IncorrectBodyException {
         HttpHeaders headers = new HttpHeaders();
 
@@ -108,6 +141,17 @@ public class AuthController {
             headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
             List<RoleDTO> roles = Arrays.asList(roleDTO);
             return authServiceClient.postUserRoles(userId, headers, roles);
+        } catch (FeignException ex) {
+            System.out.println(ex.getMessage());
+            throw new IncorrectBodyException("campos inválidos");
+        }
+    }
+
+    private ResponseEntity<String> deleteUser(String token, String userId) throws IncorrectBodyException {
+        HttpHeaders headers = new HttpHeaders();
+        try {
+            headers.add(HttpHeaders.AUTHORIZATION, ("Bearer " + token));
+            return authServiceClient.deleteUser(userId, headers);
         } catch (FeignException ex) {
             System.out.println(ex.getMessage());
             throw new IncorrectBodyException("campos inválidos");
@@ -147,6 +191,7 @@ public class AuthController {
             Gson gson = new Gson();
             User[] usersArray = gson.fromJson(users.getBody(), User[].class);
 
+            // System.out.println(usersArray.length);
             if (usersArray.length > 0) {
                 // pega o primeiro usuário com esse username, coloca a senha padrão e retorna
                 // ele
@@ -274,6 +319,17 @@ public class AuthController {
         return setRoleUser(dto.getRole(), token, userId);
     }
 
+    @DeleteMapping("/user/{userId}")
+    @PreAuthorize("hasRole('instructor')")
+    public ResponseEntity<String> deleteUser(@PathVariable String userId)
+            throws IncorrectBodyException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Jwt user = (Jwt) authentication.getPrincipal();
+        String token = user.getTokenValue();
+
+        return deleteUser(token, userId);
+    }
+
     @GetMapping("/roles")
     @PreAuthorize("hasRole('instructor')")
     public ResponseEntity<String> getRoles() throws IncorrectCredentialsException {
@@ -316,4 +372,14 @@ public class AuthController {
         return createUserKeycloak(userDTO, token);
     }
 
+    @PutMapping("/users/{id}")
+    // @PreAuthorize("hasRole('instructor')")
+    public ResponseEntity<String> updateUser(@PathVariable String id, @RequestBody @Valid UpdateUser userDTO)
+            throws IncorrectBodyException, IncorrectCredentialsException {
+        var tokenAdmin = loginKeycloak("instrutor", "123456").getBody().split(":")[1].split(",")[0].replaceAll("\"",
+                "");
+
+        System.out.println(userDTO);
+        return updateUserKeycloak(id, userDTO, tokenAdmin);
+    }
 }

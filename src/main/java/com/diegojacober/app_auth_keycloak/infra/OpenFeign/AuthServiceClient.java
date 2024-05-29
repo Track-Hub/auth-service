@@ -6,15 +6,18 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.diegojacober.app_auth_keycloak.dtos.CreateUserDTO;
 import com.diegojacober.app_auth_keycloak.dtos.RoleDTO;
+import com.diegojacober.app_auth_keycloak.dtos.UpdateUser;
 
 import feign.Headers;
 
@@ -52,4 +55,12 @@ public interface AuthServiceClient {
    @PostMapping(value = "/admin/realms/test/users")
    ResponseEntity<String> createUser(@RequestBody CreateUserDTO userDTO, @RequestHeader HttpHeaders headers);
 
+   @PutMapping(value = "/admin/realms/test/users/{id}")
+   ResponseEntity<String> updateUser(@PathVariable("id") String id, @RequestBody UpdateUser userDTO, @RequestHeader HttpHeaders headers);
+
+   @PutMapping(value = "/admin/realms/test/users/profile")
+   ResponseEntity<String> updateUserProfile(@RequestBody UpdateUser userDTO, @RequestHeader HttpHeaders headers);
+
+   @DeleteMapping(value = "/admin/realms/test/users/{id}")
+   ResponseEntity<String> deleteUser(@PathVariable("id") String id, @RequestHeader HttpHeaders headers);
 }
