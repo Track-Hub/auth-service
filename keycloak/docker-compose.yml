@@ -35,7 +35,7 @@ services:
 
 
   keycloak:
-    image: quay.io/keycloak/keycloak:latest   
+    image: quay.io/keycloak/keycloak:24.0.1   
     ports:
       - 8181:8080
     command: -v start-dev --import-realm
@@ -55,6 +55,7 @@ services:
 
 networks:
   demo-network:
+    external: true
 
 volumes:
   mariadb-server-vol:
